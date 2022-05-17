@@ -4,6 +4,9 @@ replit.nix
 .breakpoints
 .replit
 
+#ignoro i binari
+farm
+
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,c
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,c
 
