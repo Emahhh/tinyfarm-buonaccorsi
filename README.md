@@ -1,2 +1,3 @@
-# tinyfarm-buonaccorsi
-Progetto finale anno 2021/22 per chi ha superato gli esoneri
+# Tiny Farm - progetto Laboratorio II
+
+## Emanuele Buonaccorsi - 598855 - corso B
