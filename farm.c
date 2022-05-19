@@ -1,27 +1,11 @@
-#define _GNU_SOURCE   // permette di usare estensioni GNU
-#include <stdio.h>    // permette di usare scanf printf etc ...
-#include <stdlib.h>   // conversioni stringa exit() etc ...
-#include <stdbool.h>  // gestisce tipo bool
-#include <assert.h>   // permette di usare la funzione ass
-#include <string.h>   // funzioni per stringhe
-#include <errno.h>    // richiesto per usare errno
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <sys/mman.h>
-#include <sys/stat.h>        /* For mode constants */
-#include <fcntl.h>           /* For O_* constants */
+#include "xerrori.h"
+#define QUI __LINE__,__FILE__
 
 // struct contenente i parametri di input e output di ogni thread 
 typedef struct {
-  int n_thread;
-
   int* cindex;  // indice nel buffer
-  long* buffer; 
+  char** buffer; 
+  int qlen;
 
 	pthread_mutex_t *cmutex;
   sem_t *sem_free_slots;
@@ -29,30 +13,48 @@ typedef struct {
 
 } dati;
 
-void *tbody(void *arg)
-{  
-  dati *a = (dati *)arg; 
-  
+// thread worker
+void *tbody(void *arg){  
+  dati *myDati = (dati *)arg; 
+  char* file;
+  int numfile = 0; // numero di file elaborati dal thread - per debugging
+ // printf("avvio il thread %ld!\n", pthread_self());
 
-  do {
-/*     xsem_wait(a->sem_data_items,QUI);
-		xpthread_mutex_lock(a->cmutex,QUI);
+  while(true) { // prendi file da buffer, aprilo, scorri tutto ottenendo somma e manda risultato a server
+    xsem_wait(myDati->sem_data_items,QUI);
+		xpthread_mutex_lock(myDati->cmutex,QUI); // i semafori possono anche far passare due consumatori - mi serve mutua esclusione per le due op. successive
 
-    n = a->buffer[*(a->cindex) % Buf_size];
-    *(a->cindex) +=1;
-    // printf("thread %ld ha letto n = %ld\n", pthread_self(), n);
+    file = strdup(myDati->buffer[*(myDati->cindex) % myDati->qlen]);
+    *(myDati->cindex) +=1;
+   // printf("thread %ld ha preso dal buffer il nome file %s\n", pthread_self(), file);
     
-		xpthread_mutex_unlock(a->cmutex,QUI);
-    xsem_post(a->sem_free_slots,QUI);
+		xpthread_mutex_unlock(myDati->cmutex,QUI);
+    xsem_post(myDati->sem_free_slots,QUI); // fine accesso al buffer ---
 
-    if(n>0 && collatz(n)>a->tbestcollatz) {
-      a->tbestcollatz = collatz(n);
-      a->tbestn = n;
-      // printf("curr tbestcollatz=%ld \n",a->tbestcollatz);
-    } */
-  } while(n!= 0); // terminazione se trovo 0!
+    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0) break; // segnale che mi indica di terminare
 
-  // printf("questo thread è terminato con tbestcollatz=%ld \n",a->tbestcollatz);
+    // risolvi il problema
+    FILE *f = fopen(file, "r");
+    if(f==NULL) {perror("Errore apertura file"); continue;}
+
+    numfile++;
+
+    long sum = 0;
+    long n;
+    int i = 0;
+    while(true) {
+      int e = fread(&n, sizeof(long), 1, f);
+      if(e!=1) break; // se il valore e' letto correttamente e==1
+      //printf("letto il numero %ld\n", n*i);
+      sum += n*i;
+      i++;
+    }
+    fclose(f);
+    printf("thread %ld ha calcolato la somma del file %s: %ld\n", pthread_self(), file, sum);
+  }
+
+
+  printf("il thread %ld è terminato dopo aver elaborato %d file.\n", pthread_self(), numfile);
   pthread_exit(NULL); 
 } 
 
@@ -96,38 +98,54 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  
 
-  long buffer[qlen];
-  int pindex=0, cindex=0;
+
+
+
+  // inizializzo buffer e threads
+  char* buffer[qlen];
+  int pindex=0, cindex=0; // cindex è contesa da tutti i thread
 
   // avvio nthread thread consumatori
   pthread_mutex_t cmutex = PTHREAD_MUTEX_INITIALIZER;
   pthread_t t[nthread];
-  dati a[nthread];
-
+  
   sem_t sem_free_slots, sem_data_items;
+  xsem_init(&sem_free_slots, 0, qlen, QUI);
+  xsem_init(&sem_data_items, 0, 0, QUI);
 
-  xsem_init(&sem_free_slots,0,qlen,QUI);
-  xsem_init(&sem_data_items,0,0,QUI);
+  dati datiWorkers;
+  datiWorkers.buffer = buffer;	
+  datiWorkers.cindex = &cindex;
+  datiWorkers.qlen = qlen;
+  datiWorkers.cmutex = &cmutex;
+  datiWorkers.sem_data_items = &sem_data_items;
+  datiWorkers.sem_free_slots = &sem_free_slots;
 
- for(int i=0; i<nthread; i++) { // faccio partire thread consumatori
-    a[i].n_thread = i;
-
-    a[i].buffer = buffer;
-		a[i].cindex = &cindex;
-		a[i].cmutex = &cmutex;
-    a[i].sem_data_items = &sem_data_items;
-    a[i].sem_free_slots = &sem_free_slots;
-    xpthread_create(&t[i], NULL, tbody ,a+i, QUI);
+  for(int i=0; i<nthread; i++) {
+    xpthread_create(&t[i], NULL, tbody, &datiWorkers, QUI);
   }
 
   // devo mandare i nomi dei file nel buffer 
   // ottengo nomi file, ricordando che getopt permuta le opzioni all'inizio di argv
   for(int i=numopt*2+1; i<argc; i++) {
-    // argv[i] contiene il nome del file
-    printf("%s\n",argv[i]);
+    // argv[i] contiene il nome del file (se utente ha dato input giusto)
+     xsem_wait(&sem_free_slots,QUI);
+    buffer[pindex++ % qlen] = argv[i];
+    xsem_post(&sem_data_items,QUI);
+    // printf("messo nel buffer %s.\n",argv[i]);
+  }
 
+  // terminazione threads
+  for(int i=0;i<nthread;i++) {
+    xsem_wait(&sem_free_slots,__LINE__,__FILE__);
+    buffer[pindex++ % qlen]= "TerminaNonHoPiuFile!!!??";  // "TerminaNonHoPiuFile!!!?" segnale di terminazione - nessun file può avere questo nome, e non si può nemmeno inserire da linea di comando, quindi è escluso che possa venire usato da un utente ignaro
+    xsem_post(&sem_data_items,__LINE__,__FILE__);
+  }
+
+  // posso evitare di fare join?
+  for(int i=0; i<nthread; i++) {
+    xpthread_join(t[i],NULL, QUI);
   }
 
 	return 0;

@@ -11,6 +11,8 @@ EXECS=farm
 
 all: $(EXECS)
 
+farm: farm.o xerrori.o
+
 # target che cancella eseguibili e file oggetto
 clean:
 	rm -f $(EXECS) *.o  *.zip
