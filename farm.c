@@ -26,7 +26,7 @@ void *tbody(void *arg){
 
     file = strdup(myDati->buffer[*(myDati->cindex) % myDati->qlen]);
     *(myDati->cindex) +=1;
-   // printf("thread %ld ha preso dal buffer il nome file %s\n", pthread_self(), file);
+    // printf("thread %ld ha preso dal buffer il nome file %s\n", pthread_self(), file);
     
 		xpthread_mutex_unlock(myDati->cmutex,QUI);
     xsem_post(myDati->sem_free_slots,QUI); // fine accesso al buffer ---
@@ -128,6 +128,11 @@ int main(int argc, char *argv[])
 
   // devo mandare i nomi dei file nel buffer 
   // ottengo nomi file, ricordando che getopt permuta le opzioni all'inizio di argv
+/*   // print all argv
+  printf("argv è:\n");
+  for(int i=0; i<argc; i++) {
+    printf("%s\n", argv[i]);
+  } */
   for(int i=numopt*2+1; i<argc; i++) {
     // argv[i] contiene il nome del file (se utente ha dato input giusto)
      xsem_wait(&sem_free_slots,QUI);
@@ -139,7 +144,7 @@ int main(int argc, char *argv[])
   // terminazione threads
   for(int i=0;i<nthread;i++) {
     xsem_wait(&sem_free_slots,__LINE__,__FILE__);
-    buffer[pindex++ % qlen]= "TerminaNonHoPiuFile!!!??";  // "TerminaNonHoPiuFile!!!?" segnale di terminazione - nessun file può avere questo nome, e non si può nemmeno inserire da linea di comando, quindi è escluso che possa venire usato da un utente ignaro
+    buffer[pindex++ % qlen]= "TerminaNonHoPiuFile!!!?";  // "TerminaNonHoPiuFile!!!?" segnale di terminazione - nessun file può avere questo nome, e non si può nemmeno inserire da linea di comando, quindi è escluso che possa venire usato da un utente ignaro
     xsem_post(&sem_data_items,__LINE__,__FILE__);
   }
 
