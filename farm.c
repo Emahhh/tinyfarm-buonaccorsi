@@ -1,8 +1,7 @@
 #include "xerrori.h"
 #define QUI __LINE__,__FILE__
 
-// struct contenente i parametri di input e output di ogni thread 
-typedef struct {
+typedef struct { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
   char** buffer; 
   int qlen;
@@ -13,14 +12,15 @@ typedef struct {
 
 } dati;
 
+
 // thread worker
 void *tbody(void *arg){  
   dati *myDati = (dati *)arg; 
-  char* file;
   int numfile = 0; // numero di file elaborati dal thread - per debugging
  // printf("avvio il thread %ld!\n", pthread_self());
 
   while(true) { // prendi file da buffer, aprilo, scorri tutto ottenendo somma e manda risultato a server
+    char* file;
     xsem_wait(myDati->sem_data_items,QUI);
 		xpthread_mutex_lock(myDati->cmutex,QUI); // i semafori possono anche far passare due consumatori - mi serve mutua esclusione per le due op. successive
 
@@ -31,11 +31,20 @@ void *tbody(void *arg){
 		xpthread_mutex_unlock(myDati->cmutex,QUI);
     xsem_post(myDati->sem_free_slots,QUI); // fine accesso al buffer ---
 
-    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0) break; // segnale che mi indica di terminare
+    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0){  // segnale che mi indica di terminare
+      free(file);
+      break; // esco dal while e termino thread
+    }
 
     // risolvi il problema
     FILE *f = fopen(file, "r");
-    if(f==NULL) {perror("Errore apertura file"); continue;}
+    
+    if(f==NULL) {
+      printf("Il thread %ld non è riuscito ad aprire il file chiamato %s. ", pthread_self(), file); 
+      free(file); 
+      perror("Errore");
+      continue;
+    }
 
     numfile++;
 
@@ -49,11 +58,13 @@ void *tbody(void *arg){
       sum += n*i;
       i++;
     }
+
     fclose(f);
     printf("thread %ld ha calcolato la somma del file %s: %ld\n", pthread_self(), file, sum);
+    free(file);
   }
 
-
+  // free(file); // necessaria se il thread non ha eseguito file, può essere superflua altrimenti
   printf("il thread %ld è terminato dopo aver elaborato %d file.\n", pthread_self(), numfile);
   pthread_exit(NULL); 
 } 
@@ -135,7 +146,7 @@ int main(int argc, char *argv[])
   } */
   for(int i=numopt*2+1; i<argc; i++) {
     // argv[i] contiene il nome del file (se utente ha dato input giusto)
-     xsem_wait(&sem_free_slots,QUI);
+    xsem_wait(&sem_free_slots,QUI);
     buffer[pindex++ % qlen] = argv[i];
     xsem_post(&sem_data_items,QUI);
     // printf("messo nel buffer %s.\n",argv[i]);
