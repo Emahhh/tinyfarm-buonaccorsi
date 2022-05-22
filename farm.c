@@ -41,7 +41,7 @@ void *tbody(void *arg){
     
     if(f==NULL) {
       printf("Il thread %ld non è riuscito ad aprire il file chiamato %s. ", pthread_self(), file); 
-      free(file); 
+      // free(file); 
       perror("Errore");
       continue;
     }
@@ -61,7 +61,7 @@ void *tbody(void *arg){
 
     fclose(f);
     printf("thread %ld ha calcolato la somma del file %s: %ld\n", pthread_self(), file, sum);
-    free(file);
+    // free(file);
   }
 
   // free(file); // necessaria se il thread non ha eseguito file, può essere superflua altrimenti
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
   for(int i=numopt*2+1; i<argc; i++) {
     // argv[i] contiene il nome del file (se utente ha dato input giusto)
     xsem_wait(&sem_free_slots,QUI);
-    buffer[pindex++ % qlen] = strdup(argv[i]);
+    buffer[pindex++ % qlen] = argv[i];
     xsem_post(&sem_data_items,QUI);
     // printf("messo nel buffer %s.\n",argv[i]);
   }
