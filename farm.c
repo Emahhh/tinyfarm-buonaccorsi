@@ -1,5 +1,7 @@
 #include "xerrori.h"
 #define QUI __LINE__,__FILE__
+#define HOST "127.0.0.1"
+#define PORT 59885
 
 typedef struct { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
@@ -12,6 +14,40 @@ typedef struct { // struct contenente i parametri di input di ogni thread
 
 } dati;
 
+void mandaServer(long sum, char* filename){
+  int fd_skt = 0;      // file descriptor associato al socket
+  struct sockaddr_in serv_addr;
+  size_t e;
+  long tmp;
+
+  int maxLength = maxLength;
+  char buffer[maxLength];
+  strncpy(buffer, filename, maxLength);
+  buffer[maxLength-1] = '\0';
+  
+
+  
+  if ((fd_skt = socket(AF_INET, SOCK_STREAM, 0)) < 0) termina("Errore creazione socket"); // crea socket
+
+  serv_addr.sin_family = AF_INET; // assegna indirizzo
+  serv_addr.sin_port = htons(PORT); // il numero della porta deve essere convertito in network order
+  serv_addr.sin_addr.s_addr = inet_addr(HOST);
+
+  if (connect(fd_skt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) termina("Errore apertura connessione"); // apre connessione
+      
+  puts("Invio somma");
+  tmp = htonl(sum);
+  e = writen(fd_skt, &tmp, sizeof(tmp));
+  if(e!=sizeof(int)) termina("Errore write");
+
+  puts("Invio nome file");
+  e = writen(fd_skt, buffer, strlen(filename));
+  if(e!=strlen(filename)) termina("Errore write");
+
+  if(close(fd_skt)<0) perror("Errore chiusura socket");
+  puts("Connessione terminata"); 
+  return;
+}
 
 // thread worker
 void *tbody(void *arg){  
@@ -40,7 +76,7 @@ void *tbody(void *arg){
     FILE *f = fopen(file, "r");
     
     if(f==NULL) {
-      printf("Il thread %ld non è riuscito ad aprire il file chiamato %s. ", pthread_self(), file); 
+      printf("Il thread %ld non è riuscito ad aprire il file chiamato %s.\n", pthread_self(), file); 
       // free(file); 
       perror("Errore");
       continue;
@@ -60,7 +96,8 @@ void *tbody(void *arg){
     }
 
     fclose(f);
-    printf("thread %ld ha calcolato la somma del file %s: %ld\n", pthread_self(), file, sum);
+    printf("thread %ld ha calcolato la somma del file %s: %ld\n Provvedo a comunicarlo al server...\n", pthread_self(), file, sum);
+    mandaServer(sum, file);
     // free(file);
   }
 
@@ -145,8 +182,13 @@ int main(int argc, char *argv[])
   for(int i=0; i<argc; i++) {
     printf("%s\n", argv[i]);
   } */
+
   for(int i=numopt*2+1; i<argc; i++) {
     // argv[i] contiene il nome del file (se utente ha dato input giusto)
+    if(strlen(argv[i])>255){
+      printf("Il nome del file %s è troppo lungo. Lo salto.\n", argv[i]);
+      continue;
+    }
     xsem_wait(&sem_free_slots,QUI);
     buffer[pindex++ % qlen] = argv[i];
     xsem_post(&sem_data_items,QUI);

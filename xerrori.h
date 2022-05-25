@@ -15,6 +15,9 @@
 #include <sys/mman.h>
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
 
 // termina programma
@@ -69,3 +72,4 @@ int xpthread_cond_wait(pthread_cond_t *restrict cond, pthread_mutex_t *restrict 
 int xpthread_cond_signal(pthread_cond_t *cond, int linea, char *file);
 int xpthread_cond_broadcast(pthread_cond_t *cond, int linea, char *file);
 
+ssize_t writen(int fd, void *ptr, size_t n);
