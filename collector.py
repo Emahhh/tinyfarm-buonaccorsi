@@ -65,7 +65,7 @@ def gestisci_connessione(conn,addr):
     data = recv_all(conn, daRicevere)
     assert len(data)==daRicevere
 
-    somma  = struct.unpack("@q", data)
+    somma  = struct.unpack("!q", data) 
     print(f"Somma ricevuta: {somma}")
 
     # nomefile = struct.unpack("!s",data[8:])[0]

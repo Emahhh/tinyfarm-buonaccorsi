@@ -3,16 +3,41 @@
 #define HOST "127.0.0.1"
 #define PORT 59885
 
+#include <endian.h>
+
+
 bool debugPrint = false;
 
-long htonl64(long lendian){ // converts a 64 bit long little endian -> to big endian
-	//return (lendian>>32) | (lendian<<32);
-  return lendian;
+void printBinary(long l){
+  char *s = (char*)&l;
+  for(int i=0;i<sizeof(long);i++){
+    printf("%02x",s[i]);
+  }
+  printf("\n");
+  return;
 }
 
-long ntohl64(long bigendian){ // be to le
-	return (bigendian>>32) | (bigendian<<32);  
-} 
+long htonl64(long lendian){ // converts a 64 bit signed long little endian -> to big endian
+  printBinary(lendian);
+
+  long ret = 0;
+  if(__BYTE_ORDER == __LITTLE_ENDIAN){
+    ret = ((lendian & 0x00000000000000ff) << 56) |
+      ((lendian & 0x000000000000ff00) << 40) |
+      ((lendian & 0x0000000000ff0000) << 24) |
+      ((lendian & 0x00000000ff000000) << 8)  |
+      ((lendian & 0x000000ff00000000) >> 8)  |
+      ((lendian & 0x0000ff0000000000) >> 24) |
+      ((lendian & 0x00ff000000000000) >> 40) |
+      ((lendian & 0xff00000000000000) >> 56);
+  }
+  else{
+    ret = lendian;
+  }
+
+  printBinary(ret);
+	return ret;
+}
 
 typedef struct { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
