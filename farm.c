@@ -5,15 +5,6 @@
 
 bool debugPrint = false;
 
-void printBinary(long l){
-  char *s = (char*)&l;
-  for(int i=0;i<sizeof(long);i++){
-    printf("%02x",s[i]);
-  }
-  printf("\n");
-  return;
-}
-
 typedef struct dati { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
   char** buffer; 
@@ -25,16 +16,15 @@ typedef struct dati { // struct contenente i parametri di input di ogni thread
 
 } dati;
 
+
+
+
+// funzione usata dai thread per mandare somma e filename al server di stampa ----------------------------------------------
 void mandaServer(long sum, char* filename){
   int fd_skt = 0;      // file descriptor associato al socket
   struct sockaddr_in serv_addr;
   size_t e;
   long tmp;
-
-/*   int maxLength = maxLength;
-  char buffer[maxLength];
-  strncpy(buffer, filename, maxLength);
-  buffer[maxLength-1] = '\0'; */
   
   // creazione socket -----------------------------------------
   if ((fd_skt = socket(AF_INET, SOCK_STREAM, 0)) < 0) termina("Errore creazione socket"); // crea socket
@@ -68,35 +58,36 @@ void mandaServer(long sum, char* filename){
   return;
 }
 
-// thread worker
+
+
+
+// codice eseguito da ogni thread worker ------------------
 void *tbody(void *arg){  
   dati *myDati = (dati *)arg; 
   int numfile = 0; // numero di file elaborati dal thread - per debugging
- // printf("avvio il thread %ld!\n", pthread_self());
 
   while(true) { // prendi file da buffer, aprilo, scorri tutto ottenendo somma e manda risultato a server
     char* file;
+
+    // prendo un nomefile dal buffer
     xsem_wait(myDati->sem_data_items,QUI);
-		xpthread_mutex_lock(myDati->cmutex,QUI); // i semafori possono anche far passare due consumatori - mi serve mutua esclusione per le due op. successive
+		xpthread_mutex_lock(myDati->cmutex,QUI); // i semafori possono anche far passare due thread consumatori - serve mutua esclusione per le due op. successive
 
     file = myDati->buffer[*(myDati->cindex) % myDati->qlen];
     *(myDati->cindex) +=1;
-    // printf("thread %ld ha preso dal buffer il nome file %s\n", pthread_self(), file);
     
 		xpthread_mutex_unlock(myDati->cmutex,QUI);
     xsem_post(myDati->sem_free_slots,QUI); // fine accesso al buffer ---
 
-    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0){  // segnale che mi indica di terminare
-      // non devo fare free(file) in quanto stringa di terminazione non allocata dinamicamente
+    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0){  // se ho preso il segnale di terminazione, termino
       break; // esco dal while e termino thread
     }
 
-    // risolvi il problema
+    // apro file e calcolo somma -------
     FILE *f = fopen(file, "r");
     
     if(f==NULL) {
-      printf("Il thread %ld non è riuscito ad aprire il file chiamato %s.\n", pthread_self(), file); 
-      // free(file); 
+      fprintf(stderr, "Il thread %ld non è riuscito ad aprire il file chiamato %s.\n", pthread_self(), file); 
       perror("Errore");
       continue;
     }
@@ -109,7 +100,6 @@ void *tbody(void *arg){
     while(true) {
       int e = fread(&n, sizeof(long), 1, f);
       if(e!=1) break; // se il valore e' letto correttamente e==1
-      //printf("letto il numero %ld\n", n*i);
       sum += n*i;
       i++;
     }
@@ -117,18 +107,21 @@ void *tbody(void *arg){
     fclose(f);
     if(debugPrint) printf("thread %ld ha calcolato la somma del file %s: %ld. Provvedo a comunicarlo al server...\n", pthread_self(), file, sum);
     mandaServer(sum, file);
-    // free(file);
   }
 
-  // free(file); // necessaria se il thread non ha eseguito file, può essere superflua altrimenti
   if(debugPrint) printf("il thread %ld è terminato dopo aver elaborato %d file.\n", pthread_self(), numfile);
   pthread_exit(NULL); 
 } 
 
+
+
+
+// main ----------------------------------------------------------------
 int main(int argc, char *argv[])
 {
-  // controlla numero argomenti
-  if(argc<2) {
+
+  // ottengo i valori dei parametri opzionali -------------------
+  if(argc<2) {   // controlla numero argomenti
       printf("Uso: %s file [file ...] [-n nthread] [-q qlen] [-t delay]\n",argv[0]);
       return 1;
   }
@@ -140,6 +133,7 @@ int main(int argc, char *argv[])
 
   int numopt = 0; // numero di opzioni
   int opt = 0;
+
   while((opt = getopt(argc, argv, "n:q:t:")) != -1) {
     switch(opt) {
       case 'n':
@@ -160,17 +154,13 @@ int main(int argc, char *argv[])
     }
   }
 
-
   if(nthread<=0 || qlen<=0 || delay<0) {
     fprintf(stderr, "Uso: %s file [file ...] [-n nthread>0] [-q qlen>0] [-t delay>=0]\n",argv[0]);
     return 1;
   }
 
 
-
-
-
-  // inizializzo buffer e threads
+  // inizializzo buffer e threads -------------------------
   char* buffer[qlen];
   int pindex=0, cindex=0; // cindex è contesa da tutti i thread
 
@@ -194,16 +184,9 @@ int main(int argc, char *argv[])
     xpthread_create(&t[i], NULL, tbody, &datiWorkers, QUI);
   }
 
-  // devo mandare i nomi dei file nel buffer 
-  // ottengo nomi file, ricordando che getopt permuta le opzioni all'inizio di argv
-  // print all argv
-/*   printf("argv è:\n");
-  for(int i=0; i<argc; i++) {
-    printf("%s\n", argv[i]);
-  } */
-
-  for(int i=numopt*2+1; i<argc; i++) {
-    // argv[i] contiene il nome del file (se utente ha dato input giusto)
+  // mando nomi dei file nel buffer ------------------------
+  for(int i=numopt*2+1; i<argc; i++) {   // salto i primi elementi di argv, notando che getopt permuta le opzioni all'inizio di argv
+    // argv[i] contiene i nomi dei file (se utente ha dato input giusto)
     if(strlen(argv[i])>255){
       printf("Il nome del file %s è troppo lungo. Lo salto.\n", argv[i]);
       continue;
@@ -214,8 +197,8 @@ int main(int argc, char *argv[])
     // printf("messo nel buffer %s.\n",argv[i]);
   }
 
-  // terminazione threads
-  for(int i=0;i<nthread;i++) {
+  // terminazione threads ----------------
+  for(int i=0;i<nthread;i++) { // metto un messaggio di terminazione nel buffer per ogni thread
     xsem_wait(&sem_free_slots,__LINE__,__FILE__);
     buffer[pindex++ % qlen] = "TerminaNonHoPiuFile!!!?";  // "TerminaNonHoPiuFile!!!?" segnale di terminazione (nessun file può avere questo nome, e non si può nemmeno inserire da linea di comando a causa dei caratteri speciali)
     xsem_post(&sem_data_items,__LINE__,__FILE__);
@@ -227,6 +210,5 @@ int main(int argc, char *argv[])
   }
   
   printf("Tutti i thread sono terminati dopo aver esaminato tutti i file leggibili. Termino MasterWorker. \n");
-
 	return 0;
 }

@@ -7,6 +7,9 @@ HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
 PORT = 59885  # Port to listen on (non-privileged ports are > 1023)
 debugPrint = False
 
+
+
+
 # codice da eseguire nei singoli thread 
 class ClientThread(threading.Thread):
 
@@ -23,6 +26,7 @@ class ClientThread(threading.Thread):
 
       if debugPrint:
         print("====", self.ident, "ho finito")
+
 
 
 
