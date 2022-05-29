@@ -32,9 +32,9 @@ def main(host=HOST,port=PORT):
     try:  
       s.bind((host, port))
       s.listen()
+      print("In attesa del primo client...")
 
       while True:
-        print("In attesa di un client...")
         conn, addr = s.accept()
         t = ClientThread(conn,addr)
         t.start()
@@ -60,16 +60,25 @@ def gestisci_connessione(conn,addr):
     if debugPrint:  
       print(f"Contattato da {addr}")
 
-    # ---- attendo un long da 64 bit = 8 byte e una stringa da 256 byte
+    # ---- attendo un long da 64 bit = 8 byte
     daRicevere = 8
     data = recv_all(conn, daRicevere)
     assert len(data)==daRicevere
+    somma  = struct.unpack("!q", data)[0]
 
-    somma  = struct.unpack("!q", data) 
-    print(f"Somma ricevuta: {somma}")
+    # attendo un 64bit unsigned long - la lunghezza della prossima stringa
+    daRicevere = 8
+    data = recv_all(conn, daRicevere)
+    assert len(data)==daRicevere
+    lungh = struct.unpack("!Q", data)[0]
 
-    # nomefile = struct.unpack("!s",data[8:])[0]
-    # print(f"Ho ricevuto i valori:", inizio, nomefile)
+    # attendo una stringa lunga lungh byte
+    daRicevere = lungh
+    data = recv_all(conn, daRicevere)
+    assert len(data)==daRicevere
+    filename = data.decode('utf-8')
+
+    print(somma, filename)
  
  
 

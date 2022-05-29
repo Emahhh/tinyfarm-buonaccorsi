@@ -3,9 +3,6 @@
 #define HOST "127.0.0.1"
 #define PORT 59885
 
-#include <endian.h>
-
-
 bool debugPrint = false;
 
 void printBinary(long l){
@@ -17,7 +14,7 @@ void printBinary(long l){
   return;
 }
 
-typedef struct { // struct contenente i parametri di input di ogni thread 
+typedef struct dati { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
   char** buffer; 
   int qlen;
@@ -34,13 +31,12 @@ void mandaServer(long sum, char* filename){
   size_t e;
   long tmp;
 
-  int maxLength = maxLength;
+/*   int maxLength = maxLength;
   char buffer[maxLength];
   strncpy(buffer, filename, maxLength);
-  buffer[maxLength-1] = '\0';
+  buffer[maxLength-1] = '\0'; */
   
-
-  
+  // creazione socket -----------------------------------------
   if ((fd_skt = socket(AF_INET, SOCK_STREAM, 0)) < 0) termina("Errore creazione socket"); // crea socket
 
   serv_addr.sin_family = AF_INET; // assegna indirizzo
@@ -48,16 +44,25 @@ void mandaServer(long sum, char* filename){
   serv_addr.sin_addr.s_addr = inet_addr(HOST);
 
   if (connect(fd_skt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) termina("Errore apertura connessione"); // apre connessione
-      
+  
+  // connesso: invio i dati -------------------------------------------------------
+  // mando il risultato (somma)
   if(debugPrint) printf("invio somma %ld in %ld bytes\n", sum, sizeof(sum));
   tmp = htobe64(sum); // convertiamo da hardware a network order (big endian)
   e = writen(fd_skt, &tmp, sizeof(tmp));
   if(e!=sizeof(tmp)) termina("Errore write somma");
 
-/*   puts("Invio nome file");
-  e = writen(fd_skt, buffer, strlen(filename));
+  // mando lunghezza del nomefile
+  if(debugPrint) printf("invio filename %s di lunghezza %ld caratteri\n", filename, strlen(filename));
+  tmp = htobe64(strlen(filename));
+  e = writen(fd_skt, &tmp, sizeof(tmp));
+  if(e!=sizeof(tmp)) termina("Errore write lunghezza nome file");
+
+  // mando il nome del file
+  e = writen(fd_skt, filename, strlen(filename));
   if(e!=strlen(filename)) termina("Errore write nome file");
- */
+
+  // chiudo la connessione
   if(close(fd_skt)<0) perror("Errore chiusura socket");
   if(debugPrint) puts("Connessione terminata"); 
   return;

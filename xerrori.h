@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <endian.h>         // permette di usare htobe64 per convertire al network order
 
 
 // termina programma
