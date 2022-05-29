@@ -3,6 +3,17 @@
 #define HOST "127.0.0.1"
 #define PORT 59885
 
+bool debugPrint = false;
+
+long htonl64(long lendian){ // converts a 64 bit long little endian -> to big endian
+	//return (lendian>>32) | (lendian<<32);
+  return lendian;
+}
+
+long ntohl64(long bigendian){ // be to le
+	return (bigendian>>32) | (bigendian<<32);  
+} 
+
 typedef struct { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
   char** buffer; 
@@ -35,15 +46,15 @@ void mandaServer(long sum, char* filename){
 
   if (connect(fd_skt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) termina("Errore apertura connessione"); // apre connessione
       
-  puts("Invio somma");
-  tmp = htonl(sum);
+  printf("invio somma %ld in %ld bytes\n", sum, sizeof(sum));
+  tmp = htonl64(sum); // convertiamo da le a be - stiamo assumendo che la macchina usi le (come quasi tutti i processori x86)
   e = writen(fd_skt, &tmp, sizeof(tmp));
-  if(e!=sizeof(int)) termina("Errore write");
+  if(e!=sizeof(tmp)) termina("Errore write somma");
 
-  puts("Invio nome file");
+/*   puts("Invio nome file");
   e = writen(fd_skt, buffer, strlen(filename));
-  if(e!=strlen(filename)) termina("Errore write");
-
+  if(e!=strlen(filename)) termina("Errore write nome file");
+ */
   if(close(fd_skt)<0) perror("Errore chiusura socket");
   puts("Connessione terminata"); 
   return;
@@ -96,13 +107,13 @@ void *tbody(void *arg){
     }
 
     fclose(f);
-    printf("thread %ld ha calcolato la somma del file %s: %ld\n Provvedo a comunicarlo al server...\n", pthread_self(), file, sum);
+    if(debugPrint) printf("thread %ld ha calcolato la somma del file %s: %ld. Provvedo a comunicarlo al server...\n", pthread_self(), file, sum);
     mandaServer(sum, file);
     // free(file);
   }
 
   // free(file); // necessaria se il thread non ha eseguito file, può essere superflua altrimenti
-  printf("il thread %ld è terminato dopo aver elaborato %d file.\n", pthread_self(), numfile);
+  if(debugPrint) printf("il thread %ld è terminato dopo aver elaborato %d file.\n", pthread_self(), numfile);
   pthread_exit(NULL); 
 } 
 
