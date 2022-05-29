@@ -17,28 +17,6 @@ void printBinary(long l){
   return;
 }
 
-long htonl64(long lendian){ // converts a 64 bit signed long little endian -> to big endian
-  printBinary(lendian);
-
-  long ret = 0;
-  if(__BYTE_ORDER == __LITTLE_ENDIAN){
-    ret = ((lendian & 0x00000000000000ff) << 56) |
-      ((lendian & 0x000000000000ff00) << 40) |
-      ((lendian & 0x0000000000ff0000) << 24) |
-      ((lendian & 0x00000000ff000000) << 8)  |
-      ((lendian & 0x000000ff00000000) >> 8)  |
-      ((lendian & 0x0000ff0000000000) >> 24) |
-      ((lendian & 0x00ff000000000000) >> 40) |
-      ((lendian & 0xff00000000000000) >> 56);
-  }
-  else{
-    ret = lendian;
-  }
-
-  printBinary(ret);
-	return ret;
-}
-
 typedef struct { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
   char** buffer; 
@@ -71,8 +49,8 @@ void mandaServer(long sum, char* filename){
 
   if (connect(fd_skt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) termina("Errore apertura connessione"); // apre connessione
       
-  printf("invio somma %ld in %ld bytes\n", sum, sizeof(sum));
-  tmp = htonl64(sum); // convertiamo da le a be - stiamo assumendo che la macchina usi le (come quasi tutti i processori x86)
+  if(debugPrint) printf("invio somma %ld in %ld bytes\n", sum, sizeof(sum));
+  tmp = htobe64(sum); // convertiamo da hardware a network order (big endian)
   e = writen(fd_skt, &tmp, sizeof(tmp));
   if(e!=sizeof(tmp)) termina("Errore write somma");
 
@@ -81,7 +59,7 @@ void mandaServer(long sum, char* filename){
   if(e!=strlen(filename)) termina("Errore write nome file");
  */
   if(close(fd_skt)<0) perror("Errore chiusura socket");
-  puts("Connessione terminata"); 
+  if(debugPrint) puts("Connessione terminata"); 
   return;
 }
 
@@ -242,6 +220,8 @@ int main(int argc, char *argv[])
   for(int i=0; i<nthread; i++) {
     xpthread_join(t[i],NULL, QUI);
   }
+  
+  printf("Tutti i thread sono terminati dopo aver esaminato tutti i file leggibili. Termino MasterWorker. \n");
 
 	return 0;
 }
