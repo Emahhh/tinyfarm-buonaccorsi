@@ -4,6 +4,7 @@
 #define PORT 59885
 
 bool debugPrint = false;
+bool interrompi = false;
 
 // stampa il corretto utilizzo della chiamata da linea di comando - per quando l'utente chiama il programma in modo errato
 void printUso(char* argv[]){
@@ -22,6 +23,10 @@ typedef struct dati { // struct contenente i parametri di input di ogni thread
 
 } dati;
 
+void handler(int s){
+  printf("Segnale %d ricevuto dal processo principale %d\n", s, getpid());
+  interrompi = true;
+}
 
 
 
@@ -64,6 +69,13 @@ void mandaServer(long sum, char* filename){
   return;
 }
 
+
+
+// si collega con il server per mandargli uno speciale messaggio di terminazione ----------------------
+void terminaServer(){
+  // TODO: la funzione lol
+  return;
+}
 
 
 
@@ -140,7 +152,6 @@ int main(int argc, char *argv[])
   int numopt = 0; // numero di opzioni
   int opt = 0;
 
-  // TODO: memory leak per colpa di getopt???
   while((opt = getopt(argc, argv, "n:q:t:d")) != -1) {
     switch(opt) {
       case 'n':
@@ -170,6 +181,12 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+  // gestione segnali ------------------------------------------------
+  struct sigaction act;
+  act.sa_handler = &handler;
+  sigemptyset(&act.sa_mask); // pone la maschera a insieme vuoto
+  act.sa_flags = SA_RESTART;
+  sigaction(SIGINT, &act, NULL); // setto gestione di SIGINT
 
   // inizializzo buffer e threads -------------------------
   char* buffer[qlen];
@@ -198,14 +215,17 @@ int main(int argc, char *argv[])
   // mando nomi dei file nel buffer ------------------------
   for(int i=numopt+1; i<argc; i++) {   // salto i primi elementi di argv, notando che getopt permuta le opzioni all'inizio di argv
     // argv[i] contiene i nomi dei file (se utente ha dato input giusto)
+    if(interrompi) break; // ho ricevuto SIGINT, quindi smetto di inserire file nel buffer. I thread consmeranno i file rimasti, per poi terminare grazie alle operationi di terminazione.
+
     if(strlen(argv[i])>255){
       printf("Il nome del file %s è troppo lungo. Lo salto.\n", argv[i]);
+      sleep(delay);
       continue;
     }
     xsem_wait(&sem_free_slots,QUI);
     buffer[pindex++ % qlen] = argv[i];
     xsem_post(&sem_data_items,QUI);
-    // printf("messo nel buffer %s.\n",argv[i]);
+    sleep(delay);
   }
 
   // terminazione threads ----------------
@@ -215,11 +235,13 @@ int main(int argc, char *argv[])
     xsem_post(&sem_data_items,__LINE__,__FILE__);
   }
 
-  // posso evitare di fare join?
   for(int i=0; i<nthread; i++) {
     xpthread_join(t[i], NULL, QUI);
   }
-  
+
+  // ora che i thread sono terminati posso far terminare collector. Non prima, altrimenti potrei saltare qualche stampa.
+  terminaServer();
+
   printf("Tutti i thread sono terminati dopo aver esaminato tutti i file leggibili. Termino MasterWorker. \n");
 	return 0;
 }
