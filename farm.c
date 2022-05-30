@@ -5,6 +5,12 @@
 
 bool debugPrint = false;
 
+// stampa il corretto utilizzo della chiamata da linea di comando - per quando l'utente chiama il programma in modo errato
+void printUso(char* argv[]){
+  fprintf(stderr, "Uso: %s file [file ...] [-n nthread>0] [-q qlen>0] [-t delay>=0]\n", argv[0]);
+  return;
+}
+
 typedef struct dati { // struct contenente i parametri di input di ogni thread 
   int* cindex;  // indice nel buffer
   char** buffer; 
@@ -122,7 +128,7 @@ int main(int argc, char *argv[])
 
   // ottengo i valori dei parametri opzionali -------------------
   if(argc<2) {   // controlla numero argomenti
-      printf("Uso: %s file [file ...] [-n nthread] [-q qlen] [-t delay]\n",argv[0]);
+      printUso(argv);
       return 1;
   }
 
@@ -134,28 +140,32 @@ int main(int argc, char *argv[])
   int numopt = 0; // numero di opzioni
   int opt = 0;
 
-  while((opt = getopt(argc, argv, "n:q:t:")) != -1) {
+  while((opt = getopt(argc, argv, "n:q:t:d")) != -1) {
     switch(opt) {
       case 'n':
         nthread = atoi(optarg);
-        numopt++;
+        numopt+=2;
         break;
       case 'q':
         qlen = atoi(optarg);
-        numopt++;
+        numopt+=2;
         break;
       case 't':
         delay = atoi(optarg);
+        numopt+=2;
+        break;
+      case 'd':
+        debugPrint = true;
         numopt++;
         break;
       default:
-        fprintf(stderr, "Uso: %s file [file ...] [-n nthread] [-q qlen] [-t delay]\n",argv[0]);
+        printUso(argv);
         return 1;
     }
   }
 
   if(nthread<=0 || qlen<=0 || delay<0) {
-    fprintf(stderr, "Uso: %s file [file ...] [-n nthread>0] [-q qlen>0] [-t delay>=0]\n",argv[0]);
+    printUso(argv);
     return 1;
   }
 
@@ -185,7 +195,7 @@ int main(int argc, char *argv[])
   }
 
   // mando nomi dei file nel buffer ------------------------
-  for(int i=numopt*2+1; i<argc; i++) {   // salto i primi elementi di argv, notando che getopt permuta le opzioni all'inizio di argv
+  for(int i=numopt+1; i<argc; i++) {   // salto i primi elementi di argv, notando che getopt permuta le opzioni all'inizio di argv
     // argv[i] contiene i nomi dei file (se utente ha dato input giusto)
     if(strlen(argv[i])>255){
       printf("Il nome del file %s è troppo lungo. Lo salto.\n", argv[i]);
