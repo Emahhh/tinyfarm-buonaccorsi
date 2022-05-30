@@ -110,7 +110,7 @@ void *tbody(void *arg){
       i++;
     }
 
-    fclose(f);
+    if (fclose(f) != 0) fprintf(stderr, "Errore chiusura file");
     if(debugPrint) printf("thread %ld ha calcolato la somma del file %s: %ld. Provvedo a comunicarlo al server...\n", pthread_self(), file, sum);
     mandaServer(sum, file);
   }
@@ -140,6 +140,7 @@ int main(int argc, char *argv[])
   int numopt = 0; // numero di opzioni
   int opt = 0;
 
+  // TODO: memory leak per colpa di getopt???
   while((opt = getopt(argc, argv, "n:q:t:d")) != -1) {
     switch(opt) {
       case 'n':
@@ -216,7 +217,7 @@ int main(int argc, char *argv[])
 
   // posso evitare di fare join?
   for(int i=0; i<nthread; i++) {
-    xpthread_join(t[i],NULL, QUI);
+    xpthread_join(t[i], NULL, QUI);
   }
   
   printf("Tutti i thread sono terminati dopo aver esaminato tutti i file leggibili. Termino MasterWorker. \n");
