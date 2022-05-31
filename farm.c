@@ -4,7 +4,7 @@
 #define PORT 59885
 
 bool debugPrint = false;
-bool interrompi = false;
+volatile sig_atomic_t interrompi = false;
 
 // stampa il corretto utilizzo della chiamata da linea di comando - per quando l'utente chiama il programma in modo errato
 void printUso(char* argv[]){
@@ -215,6 +215,7 @@ int main(int argc, char *argv[])
   // mando nomi dei file nel buffer ------------------------
   for(int i=numopt+1; i<argc; i++) {   // salto i primi elementi di argv, notando che getopt permuta le opzioni all'inizio di argv
     // argv[i] contiene i nomi dei file (se utente ha dato input giusto)
+
     if(interrompi) break; // ho ricevuto SIGINT, quindi smetto di inserire file nel buffer. I thread consmeranno i file rimasti, per poi terminare grazie alle operationi di terminazione.
 
     if(strlen(argv[i])>255){

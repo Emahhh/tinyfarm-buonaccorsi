@@ -20,18 +20,26 @@ Per fare ciò si è scelto di stabilire un protocollo di comunicazione tra clien
   
 In questo modo il server può sapere quanti byte aspettarsi per la terza comunicazione, cioè il nome del file.
 
-## Parametro opzionale d (DebugPrint)
+## Parametro opzionale `-d` (DebugPrint)
 
 È stato aggiunto un parametro opzionale alla linea di comando. Aggiungendo `-d` alla chiamata viene modificata la variabile globale `debugPrint` a `true`, abilitando così la stampa di alcune stringhe poste in posizioni specifiche del programma per facilitarne il debug.
 
 Di default il parametro è posto a `false`, stampando solo le stringhe richieste.
 
-## Comandi di test
+## Gestione di `SIGINT`
+
+> Alla ricezione di tale segnale il processo deve completare i task eventualmente presenti nel buffer produttori/consumatori e terminare [...]
+
+Vista la richiesta di completare i task presenti nel buffer, è stato scelto di gestire il segnale in questo modo:
+
+l'handler del segnale si limita a semplicemente impostare la variabile globale `interrompi` a `true`. Prima di inserire il nome di un file nel buffer viene controllato questo valore booleano. Se ho ricevuto un segnale uscirò dal ciclo e smetterò così di inserire ulteriori file nel buffer. Passerò al chiedere ai thread di terminare permettendogli prima di completare i task già presenti.
+
+## Esempi di comandi di test
 
 Per avviare collector: `python3 collector.py`
 
 Con nomi di file non esistenti:
-`./farm file file2 file3 z0.dat dsdgfsd sgsg z-868867545.dat sd file4 file5 -n 20 -q 100 -t 6`
+`./farm file file2 file3 z0.dat dsdgfsd sgsg z-868867545.dat sd file4 file5 -n 2 -q 2 -t 1`
 
-Tutti i file di tes:
-`./farm z*?.dat -n 20 -q 1 -t 6`
+Tutti i file di test:
+`./farm z*?.dat -n 3 -q 3 -t 1`
