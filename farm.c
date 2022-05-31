@@ -6,14 +6,19 @@
 bool debugPrint = false;
 volatile sig_atomic_t interrompi = false;
 
+
+
 // stampa il corretto utilizzo della chiamata da linea di comando - per quando l'utente chiama il programma in modo errato
 void printUso(char* argv[]){
   fprintf(stderr, "Uso: %s file [file ...] [-n nthread>0] [-q qlen>0] [-t delay>=0]\n", argv[0]);
   return;
 }
 
-typedef struct dati { // struct contenente i parametri di input di ogni thread 
-  int* cindex;  // indice nel buffer
+
+
+// struct contenente i parametri di input di ogni thread
+typedef struct dati {  
+  int* cindex;  // indice nel buffer per i consumatori
   char** buffer; 
   int qlen;
 
@@ -23,14 +28,18 @@ typedef struct dati { // struct contenente i parametri di input di ogni thread
 
 } dati;
 
+
+
+// handler per il segnale SIGINT
 void handler(int s){
-  printf("Segnale %d ricevuto dal processo principale %d\n", s, getpid());
+  printf("Segnale %d ricevuto dal processo principale %d. Interrompo.\n", s, getpid());
   interrompi = true;
+  return;
 }
 
 
 
-// funzione usata dai thread per mandare somma e filename al server di stampa ----------------------------------------------
+// funzione usata dai thread per mandare SOMMA e FILENAME al server di stampa
 void mandaServer(long sum, char* filename){
   int fd_skt = 0;      // file descriptor associato al socket
   struct sockaddr_in serv_addr;
@@ -44,9 +53,9 @@ void mandaServer(long sum, char* filename){
   serv_addr.sin_port = htons(PORT); // il numero della porta deve essere convertito in network order
   serv_addr.sin_addr.s_addr = inet_addr(HOST);
 
-  if (connect(fd_skt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) termina("Errore apertura connessione"); // apre connessione
+  if (  connect(fd_skt, (struct sockaddr*) &serv_addr, sizeof(serv_addr))   < 0 ) termina("Errore apertura connessione"); // apre connessione
   
-  // connesso: invio i dati -------------------------------------------------------
+  // connesso: invio i dati nell'ordine prestabilito -------------------------------------------------------
   // mando lunghezza del nomefile
   if(debugPrint) printf("invio filename %s di lunghezza %ld caratteri\n", filename, strlen(filename));
   tmp = htobe64(strlen(filename));
@@ -71,7 +80,7 @@ void mandaServer(long sum, char* filename){
 
 
 
-// si collega con il server per mandargli uno speciale messaggio di terminazione ----------------------
+// si collega con il server per mandargli uno speciale messaggio di terminazione prestabilito
 void terminaServer(){
   if(debugPrint) puts("Chiedo al server di terminare.");
   mandaServer(0, "TerminaServer!!!?");
@@ -80,12 +89,13 @@ void terminaServer(){
 
 
 
-// codice eseguito da ogni thread worker ------------------
+// codice eseguito da ogni thread worker
 void *tbody(void *arg){  
   dati *myDati = (dati *)arg; 
   int numfile = 0; // numero di file elaborati dal thread - per debugging
 
-  while(true) { // prendi file da buffer, aprilo, scorri tutto ottenendo somma e manda risultato a server
+  while(true) 
+    { // prendi file da buffer, aprilo, scorri tutto ottenendo somma e manda risultato a server
     char* file;
 
     // prendo un nomefile dal buffer
@@ -98,19 +108,15 @@ void *tbody(void *arg){
 		xpthread_mutex_unlock(myDati->cmutex,QUI);
     xsem_post(myDati->sem_free_slots,QUI); // fine accesso al buffer ---
 
-    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0){  // se ho preso il segnale di terminazione, termino
-      break; // esco dal while e termino thread
-    }
+    if(strcmp(file, "TerminaNonHoPiuFile!!!?") == 0) break; // se ho preso il segnale di terminazione, termino
 
     // apro file e calcolo somma -------
     FILE *f = fopen(file, "r");
-    
     if(f==NULL) {
       fprintf(stderr, "Il thread %ld non è riuscito ad aprire il file chiamato %s.\n", pthread_self(), file); 
       perror("Errore");
       continue;
     }
-
     numfile++;
 
     long sum = 0;
@@ -125,7 +131,8 @@ void *tbody(void *arg){
 
     if (fclose(f) != 0) fprintf(stderr, "Errore chiusura file");
     if(debugPrint) printf("thread %ld ha calcolato la somma del file %s: %ld. Provvedo a comunicarlo al server...\n", pthread_self(), file, sum);
-    mandaServer(sum, file);
+
+    mandaServer(sum, file); // mando risultato connettendomi al server
   }
 
   if(debugPrint) printf("il thread %ld è terminato dopo aver elaborato %d file.\n", pthread_self(), numfile);
@@ -134,13 +141,10 @@ void *tbody(void *arg){
 
 
 
-
-// main ----------------------------------------------------------------
 int main(int argc, char *argv[])
 {
-
-  // ottengo i valori dei parametri opzionali -------------------
-  if(argc<2) {   // controlla numero argomenti
+  // ottengo i valori dei parametri opzionali -----------------------
+  if(argc<2) {
       printUso(argv);
       return 1;
   }
@@ -182,12 +186,14 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+
   // gestione segnali ------------------------------------------------
   struct sigaction act;
   act.sa_handler = &handler;
   sigemptyset(&act.sa_mask); // pone la maschera a insieme vuoto
   act.sa_flags = SA_RESTART;
   sigaction(SIGINT, &act, NULL); // setto gestione di SIGINT
+
 
   // inizializzo buffer e threads -------------------------
   char* buffer[qlen];
@@ -213,8 +219,10 @@ int main(int argc, char *argv[])
     xpthread_create(&t[i], NULL, tbody, &datiWorkers, QUI);
   }
 
+
   // mando nomi dei file nel buffer ------------------------
-  for(int i=numopt+1; i<argc; i++) {   // salto i primi elementi di argv, notando che getopt permuta le opzioni all'inizio di argv
+  for(int i=numopt+1; i<argc; i++) {   
+    // salto i primi elementi di argv, osservando che getopt permuta le opzioni all'inizio di argv
     // argv[i] contiene i nomi dei file (se utente ha dato input giusto)
 
     if(interrompi) break; // ho ricevuto SIGINT, quindi smetto di inserire file nel buffer. I thread consmeranno i file rimasti, per poi terminare grazie alle operationi di terminazione.
@@ -231,9 +239,10 @@ int main(int argc, char *argv[])
   }
 
   // terminazione threads ----------------
-  for(int i=0;i<nthread;i++) { // metto un messaggio di terminazione nel buffer per ogni thread
+  for(int i=0;i<nthread;i++) {
+    // metto un messaggio di terminazione nel buffer per ogni thread
     xsem_wait(&sem_free_slots,__LINE__,__FILE__);
-    buffer[pindex++ % qlen] = "TerminaNonHoPiuFile!!!?";  // "TerminaNonHoPiuFile!!!?" segnale di terminazione (nessun file può avere questo nome, e non si può nemmeno inserire da linea di comando a causa dei caratteri speciali)
+    buffer[pindex++ % qlen] = "TerminaNonHoPiuFile!!!?";  // stringa usata come segnale di terminazione (nessun file può avere questo nome, e non si può nemmeno inserire da linea di comando a causa dei caratteri speciali)
     xsem_post(&sem_data_items,__LINE__,__FILE__);
   }
 
@@ -241,8 +250,7 @@ int main(int argc, char *argv[])
     xpthread_join(t[i], NULL, QUI);
   }
 
-  // ora che i thread sono terminati posso far terminare collector. Non prima, altrimenti potrei saltare qualche stampa.
-  terminaServer();
+  terminaServer(); // manda messaggio di terminazione al server
 
   printf("Tutti i thread sono terminati dopo aver esaminato tutti i file leggibili. Termino MasterWorker. \n");
 	return 0;
