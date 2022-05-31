@@ -47,12 +47,6 @@ void mandaServer(long sum, char* filename){
   if (connect(fd_skt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) termina("Errore apertura connessione"); // apre connessione
   
   // connesso: invio i dati -------------------------------------------------------
-  // mando il risultato (somma)
-  if(debugPrint) printf("invio somma %ld in %ld bytes\n", sum, sizeof(sum));
-  tmp = htobe64(sum); // convertiamo da hardware a network order (big endian)
-  e = writen(fd_skt, &tmp, sizeof(tmp));
-  if(e!=sizeof(tmp)) termina("Errore write somma");
-
   // mando lunghezza del nomefile
   if(debugPrint) printf("invio filename %s di lunghezza %ld caratteri\n", filename, strlen(filename));
   tmp = htobe64(strlen(filename));
@@ -62,6 +56,12 @@ void mandaServer(long sum, char* filename){
   // mando il nome del file
   e = writen(fd_skt, filename, strlen(filename));
   if(e!=strlen(filename)) termina("Errore write nome file");
+
+  // mando il risultato (somma)
+  if(debugPrint) printf("invio somma %ld in %ld bytes\n", sum, sizeof(sum));
+  tmp = htobe64(sum); // convertiamo da hardware a network order (big endian)
+  e = writen(fd_skt, &tmp, sizeof(tmp));
+  if(e!=sizeof(tmp)) termina("Errore write somma");
 
   // chiudo la connessione
   if(close(fd_skt)<0) perror("Errore chiusura socket");
@@ -73,7 +73,8 @@ void mandaServer(long sum, char* filename){
 
 // si collega con il server per mandargli uno speciale messaggio di terminazione ----------------------
 void terminaServer(){
-  // TODO: la funzione lol
+  if(debugPrint) puts("Chiedo al server di terminare.");
+  mandaServer(0, "TerminaServer!!!?");
   return;
 }
 

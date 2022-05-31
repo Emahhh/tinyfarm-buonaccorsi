@@ -8,17 +8,19 @@ Si è scelto di creare un server **basato sui thread**.
 
 Ad ogni thread viene mandato un singolo file. Il thread si occupa della connessione e della stampa, per poi terminare.
 
+Se il thread riceve uno speciale messaggio di terminazione inviatogli dal client, fa terminare l'intero programma.
+
 ## Comunicazione client-server
 
 È stato richiesto, per ogni file, di fare in modo che il server Python stampi il nome del file e la corrispettiva somma.
 
 Per fare ciò si è scelto di stabilire un protocollo di comunicazione tra client e server che prevede di mandare, in ordine:
 
-- la **somma** calcolata dal thread worker
 - la **lunghezza** del nome del file
 - il **nome del file**
-  
-In questo modo il server può sapere quanti byte aspettarsi per la terza comunicazione, cioè il nome del file.
+- la **somma** calcolata dal thread worker
+
+In questo modo il server può sapere quanti byte aspettarsi per la seconda comunicazione, cioè il nome del file.
 
 ## Parametro opzionale `-d` (DebugPrint)
 
@@ -32,7 +34,7 @@ Di default il parametro è posto a `false`, stampando solo le stringhe richieste
 
 Vista la richiesta di completare i task presenti nel buffer, è stato scelto di gestire il segnale in questo modo:
 
-l'handler del segnale si limita a semplicemente impostare la variabile globale `interrompi` a `true`. Prima di inserire il nome di un file nel buffer viene controllato questo valore booleano. Se ho ricevuto un segnale uscirò dal ciclo e smetterò così di inserire ulteriori file nel buffer. Passerò al chiedere ai thread di terminare permettendogli prima di completare i task già presenti.
+l'handler del segnale imposta la variabile globale `interrompi` a `true`. Prima di inserire il nome di un file nel buffer viene controllato questo valore booleano. Se ho ricevuto un segnale uscirò dal ciclo e smetterò così di inserire ulteriori file nel buffer. Passerò al chiedere ai thread di terminare permettendogli prima di completare i task già presenti. Stessa cosa per il server.
 
 ## Esempi di comandi di test
 
