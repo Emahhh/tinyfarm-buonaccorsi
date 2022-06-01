@@ -72,7 +72,7 @@ def gestisci_connessione(conn,addr):
     daRicevere = lungh
     data = recv_all(conn, daRicevere)
     assert len(data)==daRicevere
-    filename = data.decode('utf-8')
+    filename = data.decode('ASCII')
     
     # ---- attendo somma: un long da 64 bit = 8 byte
     daRicevere = 8
