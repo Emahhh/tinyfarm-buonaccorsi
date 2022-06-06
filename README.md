@@ -36,12 +36,12 @@ Vista la richiesta di completare i task presenti nel buffer, è stato scelto di 
 
 l'handler del segnale imposta la variabile globale `interrompi` a `true`. Prima di inserire il nome di un file nel buffer viene controllato questo valore booleano. Se ho ricevuto un segnale uscirò dal ciclo e smetterò così di inserire ulteriori file nel buffer. Passerò al chiedere ai thread di terminare permettendogli prima di completare i task già presenti. Stessa cosa per il server.
 
-## Esempi di comandi di test
+## Alcuni esempi di comandi di test
 
 Per avviare collector: `python3 collector.py`
 
 Con nomi di file non esistenti:
-`./farm file file2 file3 z0.dat dsdgfsd sgsg z-868867545.dat sd file4 file5 -n 2 -q 2 -t 1`
+`./farm file file2 file3 z0.dat dsdgfsd sgsg z-868867545.dat sd file4 file5 -t 500`
 
 Tutti i file di test:
-`./farm z*?.dat -n 3 -q 3 -t 1`
+`./farm z*?.dat -t 500`

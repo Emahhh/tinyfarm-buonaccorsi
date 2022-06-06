@@ -229,13 +229,13 @@ int main(int argc, char *argv[])
 
     if(strlen(argv[i])>255){
       printf("Il nome del file %s è troppo lungo. Lo salto.\n", argv[i]);
-      sleep(delay);
+      usleep(delay*1000); // 1 ms = 1000 us
       continue;
     }
     xsem_wait(&sem_free_slots,QUI);
     buffer[pindex++ % qlen] = argv[i];
     xsem_post(&sem_data_items,QUI);
-    sleep(delay);
+    usleep(delay*1000);
   }
 
   // terminazione threads ----------------
